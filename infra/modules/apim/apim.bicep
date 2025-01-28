@@ -16,6 +16,23 @@ param managedIdentityName string
 param clientAppId string = ' '
 param tenantId string = tenant().tenantId
 param audience string = 'https://cognitiveservices.azure.com/.default'
+param openAiKeys object = {
+  'openai-backend-0': {
+    key: ''  // Azure OpenAI Ponderosa DZ Standard key
+  }
+  'openai-backend-1': {
+    key: ''  // Azure OpenAI East Global key
+  }
+  'openai-backend-2': {
+    key: ''  // Azure OpenAI Ponderosa GPT-4o-2 key
+  }
+  'openai-backend-3': {
+    key: ''  // Azure OpenAI East GPT-4o key
+  }
+  'openai-backend-4': {
+    key: ''  // Azure OpenAI Northcentral DZ key
+  }
+}
 
 var openAiApiBackendId = 'openai-backend'
 var openAiApiUamiNamedValue = 'uami-client-id'
@@ -85,6 +102,17 @@ resource apimOpenaiApi 'Microsoft.ApiManagement/service/apis@2022-08-01' = {
     protocols: [
       'https'
     ]
+  }
+}
+
+resource apimSubscription 'Microsoft.ApiManagement/service/subscriptions@2021-08-01' = {
+  parent: apimService
+  name: 'openai-subscription'
+  properties: {
+    scope: '/apis/${apimOpenaiApi.name}'
+    displayName: 'OpenAI API Subscription'
+    state: 'active'
+    allowTracing: true
   }
 }
 
@@ -165,6 +193,16 @@ resource openaiApiPolicy 'Microsoft.ApiManagement/service/apis/policies@2022-08-
   ]
 }
 
+resource openAiKeyNamedValues 'Microsoft.ApiManagement/service/namedValues@2022-08-01' = [for (config, i) in items(openAiKeys): {
+  name: '${config.key}-key'
+  parent: apimService
+  properties: {
+    displayName: '${config.key}-key'
+    secret: true
+    value: config.value.key
+  }
+}]
+
 resource apimLogger 'Microsoft.ApiManagement/service/loggers@2021-12-01-preview' = {
   name: 'appinsights-logger'
   parent: apimService
@@ -187,17 +225,6 @@ resource apimUser 'Microsoft.ApiManagement/service/users@2020-06-01-preview' = {
     lastName: 'User'
     email: 'myuser@example.com'
     state: 'active'
-  }
-}
-
-resource apimSubscription 'Microsoft.ApiManagement/service/subscriptions@2020-06-01-preview' = {
-  parent: apimService
-  name: 'mySubscription'
-  properties: {
-    displayName: 'My Subscription'
-    state: 'active'
-    allowTracing: true
-    scope: '/apis/${apimOpenaiApi.name}'
   }
 }
 

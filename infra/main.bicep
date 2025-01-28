@@ -36,15 +36,24 @@ param applicationInsightsName string = ''
 param openAiInstances object = {
   openAi1: {
     name: 'openai1'
-    location: 'eastus'
-  }
-  openAi2: {
+    location: 'westus'
+    existingEndpoint: 'https://azure-openai-ponderosa.openai.azure.com/openai/deployments/gpt-4o-data-zone-standard/chat/completions?api-version=2024-08-01-preview'
+  }, openAi2: {
     name: 'openai2'
-    location: 'northcentralus'
-  }
-  openAi3: {
+    location: 'eastus'
+    existingEndpoint: 'https://azure-openai-east.openai.azure.com/openai/deployments/gpt-4o-east-global/chat/completions?api-version=2024-08-01-preview'
+  }, openAi3: {
     name: 'openai3'
-    location: 'eastus2'
+    location: 'westus'
+    existingEndpoint: 'https://azure-openai-ponderosa.openai.azure.com/openai/deployments/gpt-4o-2/chat/completions?api-version=2024-08-01-preview'
+  }, openAi4: {
+    name: 'openai4'
+    location: 'eastus'
+    existingEndpoint: 'https://azure-openai-east.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-08-01-preview'
+  }, openAi5: {
+    name: 'openai5'
+    location: 'northcentralus'
+    existingEndpoint: 'https://ponderosa-openai-northcentral.openai.azure.com/openai/deployments/gpt-4o-northcentral-dz/chat/completions?api-version=2024-08-01-preview'
   }
 }
 
@@ -79,8 +88,9 @@ param tags object = { 'azd-env-name': environmentName }
 param entraAuth bool = false
 param entraTenantId string = ''
 param entraClientId string = ''
-param entraAudience string = '' 
+param entraAudience string = ''
 
+param openAiKeys object
 
 // Load abbreviations from JSON file
 var abbrs = loadJsonContent('./abbreviations.json')
@@ -117,46 +127,6 @@ module monitoring './modules/monitor/monitoring.bicep' = {
   }
 }
 
-module openAis 'modules/ai/cognitiveservices.bicep' = [for (config, i) in items(openAiInstances): {
-  name: '${config.value.name}-${resourceToken}'
-  scope: resourceGroup
-  params: {
-    name: '${config.value.name}-${resourceToken}'
-    location: config.value.location
-    tags: tags
-    managedIdentityName: managedIdentity.outputs.managedIdentityName
-    sku: {
-      name: openAiSkuName
-    }
-    deploymentCapacity: deploymentCapacity
-    deployments: [
-      {
-        name: chatGptDeploymentName
-        model: {
-          format: 'OpenAI'
-          name: chatGptModelName
-          version: chatGptModelVersion
-        }
-        scaleSettings: {
-          scaleType: 'Standard'
-        }
-      }
-      {
-        name: embeddingGptDeploymentName
-        model: {
-          format: 'OpenAI'
-          name: embeddingGptModelName
-          version: embeddingGptModelVersion
-        }
-        sku: {
-          name: 'Standard'
-          capacity: deploymentCapacity
-        }
-      }
-    ]
-  }
-}]
-
 module apim './modules/apim/apim.bicep' = {
   name: 'apim'
   scope: resourceGroup
@@ -165,12 +135,14 @@ module apim './modules/apim/apim.bicep' = {
     location: location
     tags: tags
     applicationInsightsName: monitoring.outputs.applicationInsightsName
-    openAiUris: [for i in range(0, length(openAiInstances)): openAis[i].outputs.openAiEndpointUri]
     managedIdentityName: managedIdentity.outputs.managedIdentityName
     entraAuth: entraAuth
     clientAppId: entraAuth ? entraClientId : null 
     tenantId: entraAuth ? entraTenantId : null
     audience: entraAuth ? entraAudience : null
+    openAiKeys: openAiKeys
+    // Use base URLs without query parameters
+    openAiUris: ['https://azure-openai-ponderosa.openai.azure.com', 'https://azure-openai-east.openai.azure.com', 'https://azure-openai-ponderosa.openai.azure.com', 'https://azure-openai-east.openai.azure.com', 'https://ponderosa-openai-northcentral.openai.azure.com']
   }
 }
 

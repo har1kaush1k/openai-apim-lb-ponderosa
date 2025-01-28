@@ -25,6 +25,28 @@
       "metadata": {
         "description": "The OpenAI endpoints capacity (in thousands of tokens per minute)."
       }
+    },
+    "openAiKeys": {
+      "value": {
+        "openai-backend-0": {
+          "key": "${OPENAI_KEY_PONDEROSA_DZ}"
+        },
+        "openai-backend-1": {
+          "key": "${OPENAI_KEY_EAST_GLOBAL}"
+        },
+        "openai-backend-2": {
+          "key": "${OPENAI_KEY_PONDEROSA_GPT4O2}"
+        },
+        "openai-backend-3": {
+          "key": "${OPENAI_KEY_EAST_GPT4O}"
+        },
+        "openai-backend-4": {
+          "key": "${OPENAI_KEY_NORTHCENTRAL_DZ}"
+        }
+      },
+      "metadata": {
+        "description": "API keys for each OpenAI endpoint"
+      }
     }
   }
 }

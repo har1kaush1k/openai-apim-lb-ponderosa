@@ -7,20 +7,15 @@
         <choose>
             <when condition="@(context.Variables.ContainsKey("listBackends") == false)">
                 <set-variable name="listBackends" value="@{
-                    // -------------------------------------------------
-                    // ------- Explanation of backend properties -------
-                    // -------------------------------------------------
-                    // "url":          Your backend url
-                    // "priority":     Lower value means higher priority over other backends. 
-                    //                 If you have more than one Priority 1 backends, they will always be used instead
-                    //                 of Priority 2 or higher. Higher values backends will only be used if your lower values (top priority) are all throttling.
-                    // "isThrottling": Indicates if this endpoint is returning 429 (Too many requests) currently
-                    // "retryAfter":   We use it to know when to mark this endpoint as healthy again after we received a 429 response
-
                     JArray backends = new JArray();
+                    
                     backends.Add(new JObject()
                     {
                         { "backend-id", "openai-backend-0" },
+                        { "url", "https://azure-openai-ponderosa.openai.azure.com" },
+                        { "path", "/openai/deployments/gpt-4o-data-zone-standard/chat/completions" },
+                        { "api-version", "2024-08-01-preview" },
+                        { "key-name", "openai-backend-0-key" },
                         { "priority", 1},
                         { "isThrottling", false }, 
                         { "retryAfter", DateTime.MinValue } 
@@ -29,6 +24,10 @@
                     backends.Add(new JObject()
                     {
                         { "backend-id", "openai-backend-1" },
+                        { "url", "https://azure-openai-east.openai.azure.com" },
+                        { "path", "/openai/deployments/gpt-4o-east-global/chat/completions" },
+                        { "api-version", "2024-08-01-preview" },
+                        { "key-name", "openai-backend-1-key" },
                         { "priority", 1},
                         { "isThrottling", false },
                         { "retryAfter", DateTime.MinValue }
@@ -37,6 +36,34 @@
                     backends.Add(new JObject()
                     {
                         { "backend-id", "openai-backend-2" },
+                        { "url", "https://azure-openai-ponderosa.openai.azure.com" },
+                        { "path", "/openai/deployments/gpt-4o-2/chat/completions" },
+                        { "api-version", "2024-08-01-preview" },
+                        { "key-name", "openai-backend-2-key" },
+                        { "priority", 1},
+                        { "isThrottling", false },
+                        { "retryAfter", DateTime.MinValue }
+                    });
+
+                    backends.Add(new JObject()
+                    {
+                        { "backend-id", "openai-backend-3" },
+                        { "url", "https://azure-openai-east.openai.azure.com" },
+                        { "path", "/openai/deployments/gpt-4o/chat/completions" },
+                        { "api-version", "2024-08-01-preview" },
+                        { "key-name", "openai-backend-3-key" },
+                        { "priority", 1},
+                        { "isThrottling", false },
+                        { "retryAfter", DateTime.MinValue }
+                    });
+
+                    backends.Add(new JObject()
+                    {
+                        { "backend-id", "openai-backend-4" },
+                        { "url", "https://ponderosa-openai-northcentral.openai.azure.com" },
+                        { "path", "/openai/deployments/gpt-4o-northcentral-dz/chat/completions" },
+                        { "api-version", "2024-08-01-preview" },
+                        { "key-name", "openai-backend-4-key" },
                         { "priority", 1},
                         { "isThrottling", false },
                         { "retryAfter", DateTime.MinValue }
@@ -73,8 +100,28 @@
         <set-header name="Authorization" exists-action="override">
             <value>@("Bearer " + (string)context.Variables["msi-access-token"])</value>
         </set-header>
-        <set-variable name="backendIndex" value="-1" />
-        <set-variable name="remainingBackends" value="1" />
+        <!-- Select the backend to use -->
+        <set-variable name="selectedBackend" value="@{
+            JArray backends = (JArray)context.Variables["listBackends"];
+            JObject selectedBackend = null;
+            int lowestPriority = int.MaxValue;
+            
+            foreach (JObject backend in backends) {
+                if (!(bool)backend["isThrottling"] && (int)backend["priority"] <= lowestPriority) {
+                    selectedBackend = backend;
+                    lowestPriority = (int)backend["priority"];
+                }
+            }
+            
+            return selectedBackend;
+        }" />
+        
+        <!-- Set the backend URL and add the API key -->
+        <set-backend-service backend-id="@((string)((JObject)context.Variables["selectedBackend"])["backend-id"])" />
+        <rewrite-uri template="@((string)((JObject)context.Variables["selectedBackend"])["path"] + "?api-version=" + (string)((JObject)context.Variables["selectedBackend"])["api-version"])" />
+        <set-header name="api-key" exists-action="override">
+            <value>@(context.Variables.GetValueOrDefault<string>((string)((JObject)context.Variables["selectedBackend"])["key-name"]))</value>
+        </set-header>
     </inbound>
     <backend>
         <retry condition="@(context.Response != null && (context.Response.StatusCode == 401 || context.Response.StatusCode == 429 || context.Response.StatusCode >= 500) && (int.Parse((string)context.Variables["remainingBackends"])) > 0)" count="50" interval="0">
